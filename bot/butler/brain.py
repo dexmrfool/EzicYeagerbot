@@ -66,11 +66,14 @@ class ButlerBrain:
         # 4. Invoke LLM
         response_text = None
         if self.gemini_client:
-            candidate_models = [
-                settings.DEFAULT_TRANSLATION_MODEL or "gemini-3.6-flash",
-                "gemini-3.5-flash",
-                "gemini-3.5-flash-lite"
-            ]
+            candidate_models = list(dict.fromkeys([
+                settings.DEFAULT_TRANSLATION_MODEL or "gemini-3.5-flash-lite",
+                "gemini-flash-lite-latest",
+                "gemini-3.5-flash-lite",
+                "gemini-3.1-flash-lite",
+                "gemini-3.7-flash",
+                "gemini-3.6-flash"
+            ]))
             for model in candidate_models:
                 try:
                     response = await self.gemini_client.aio.models.generate_content(

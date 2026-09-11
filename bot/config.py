@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # Bot Identity & Defaults
     BOT_NAME: str = "EzicYeager"
     DEFAULT_TARGET_LANGUAGE: str = "en"
-    DEFAULT_TRANSLATION_MODEL: str = "gemini-3.6-flash"
+    DEFAULT_TRANSLATION_MODEL: str = "gemini-3.5-flash-lite"
     TRANSLATION_PROVIDER: str = "gemini"  # "gemini" or "openai"
 
     # AI API Keys
@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # Web Search Configuration
     WEB_SEARCH_PROVIDER: str = "duckduckgo"  # "duckduckgo", "tavily", "serper"
     WEB_SEARCH_API_KEY: str = ""
+
+    # Keep-Alive & Self-Pinging for Free Tier Hosts (Render, Koyeb, etc.)
+    RENDER_EXTERNAL_URL: str = ""
+    KEEP_ALIVE_URL: str = ""
 
     # Database & Cache
     DATABASE_URL: str = "sqlite+aiosqlite:///data/bot.db"

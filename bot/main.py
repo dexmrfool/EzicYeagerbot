@@ -27,6 +27,23 @@ async def start_health_server(port: int) -> web.AppRunner:
     return runner
 
 
+async def run_keep_alive_pinger(health_url: str):
+    """Periodically pings the health endpoint to prevent Render free-tier containers from spinning down."""
+    import aiohttp
+    logger.info(f"Keep-alive self-pinger active for: {health_url}")
+    await asyncio.sleep(60)
+    while True:
+        try:
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(health_url) as resp:
+                    logger.debug(f"Keep-alive self-ping responded with HTTP {resp.status}")
+        except Exception as pe:
+            logger.debug(f"Keep-alive ping notice: {pe}")
+        # Ping every 8 minutes (Render sleeps after 15 minutes of inactivity)
+        await asyncio.sleep(480)
+
+
 async def main():
     logger.info("Starting Telegram Multilingual Translator + Butler AI Bot...")
 
@@ -68,7 +85,22 @@ async def main():
 
     set_startup_time()
 
-    # 6. Start Polling with Graceful Shutdown
+    # 6. Start Keep-Alive Self-Pinger (keeps Render free tier active 24/7)
+    keep_alive_url = (
+        settings.KEEP_ALIVE_URL
+        or os.environ.get("RENDER_EXTERNAL_URL", "").strip().rstrip("/")
+        or os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip().rstrip("/")
+    )
+    if keep_alive_url and not keep_alive_url.startswith("http"):
+        keep_alive_url = f"https://{keep_alive_url}"
+    if keep_alive_url and not keep_alive_url.endswith("/health"):
+        keep_alive_url = f"{keep_alive_url}/health"
+
+    keep_alive_task = None
+    if keep_alive_url:
+        keep_alive_task = asyncio.create_task(run_keep_alive_pinger(keep_alive_url))
+
+    # 7. Start Polling with Graceful Shutdown
     try:
         await dp.start_polling(
             bot,
@@ -79,6 +111,8 @@ async def main():
         logger.info("Shutdown signal received.")
     finally:
         logger.info("Cleaning up and closing connections...")
+        if keep_alive_task:
+            keep_alive_task.cancel()
         if runner:
             await runner.cleanup()
         await bot.session.close()
