@@ -1,0 +1,22 @@
+{
+  "language": "universal",
+  "name": "General & Internet Slang",
+  "entries": [
+    { "source": "fr", "target": "for real", "category": "abbreviation" },
+    { "source": "ngl", "target": "not gonna lie", "category": "abbreviation" },
+    { "source": "tbh", "target": "to be honest", "category": "abbreviation" },
+    { "source": "idk", "target": "I don't know", "category": "abbreviation" },
+    { "source": "wym", "target": "what you mean", "category": "abbreviation" },
+    { "source": "wya", "target": "where you at", "category": "abbreviation" },
+    { "source": "goat", "target": "greatest of all time", "category": "slang" },
+    { "source": "cap", "target": "lie / fake", "category": "slang" },
+    { "source": "no cap", "target": "no lie / for real", "category": "slang" },
+    { "source": "mid", "target": "mediocre / average", "category": "slang" },
+    { "source": "based", "target": "courageous / undeniably true", "category": "slang" },
+    { "source": "cook", "target": "let them work / make something great", "category": "slang" },
+    { "source": "let him cook", "target": "give him space, he's doing something great", "category": "slang" },
+    { "source": "op", "target": "overpowered / original poster", "category": "slang" },
+    { "source": "nerf", "target": "weaken / downgrade", "category": "slang" },
+    { "source": "buff", "target": "strengthen / upgrade", "category": "slang" }
+  ]
+}

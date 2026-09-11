@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: telegram_translator_butler
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Optional PostgreSQL service (uncomment to use PostgreSQL instead of SQLite)
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: butler_postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: butlerdb
+  #     POSTGRES_USER: butleruser
+  #     POSTGRES_PASSWORD: secure_db_password_here
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+# volumes:
+#   pgdata:

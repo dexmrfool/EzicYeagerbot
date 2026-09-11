@@ -1,0 +1,26 @@
+{
+  "language": "my",
+  "name": "Burmese (Myanmar)",
+  "entries": [
+    { "source": "ဟေ့ကောင်", "target": "hey bro / hey dude", "category": "slang" },
+    { "source": "ဘရို", "target": "bro", "category": "slang" },
+    { "source": "ဆရာကြီး", "target": "boss / big man / pro", "category": "slang" },
+    { "source": "နေကောင်းလား", "target": "how are you doing", "category": "casual" },
+    { "source": "ကျေးဇူးပဲ", "target": "thanks a lot", "category": "casual" },
+    { "source": "မိုက်တယ်", "target": "awesome / dope", "category": "slang" },
+    { "source": "လန်းတယ်", "target": "cool / fresh / fire", "category": "slang" },
+    { "source": "ရှယ်ပဲ", "target": "pure perfection / elite", "category": "slang" },
+    { "source": "ဘောမ", "target": "ass-kisser / bootlicker", "category": "offensive" },
+    { "source": "လီးပဲ", "target": "bullshit / my dick / fuck off", "category": "profanity" },
+    { "source": "လီးလား", "target": "what the fuck / what kind of dick is that", "category": "profanity" },
+    { "source": "လီးမို့လို့လား", "target": "why the fuck should I care", "category": "profanity" },
+    { "source": "မအေလိုး", "target": "motherfucker", "category": "profanity" },
+    { "source": "စောက်ရူး", "target": "fucking idiot", "category": "profanity" },
+    { "source": "စောက်ကောင်", "target": "fucking bastard / little shit", "category": "profanity" },
+    { "source": "စောက်ပေါ", "target": "fucking clown / dumbass", "category": "profanity" },
+    { "source": "ခွေးသူတောင်းစား", "target": "dog beggar / bastard", "category": "offensive" },
+    { "source": "ခွေးမသား", "target": "son of a bitch", "category": "profanity" },
+    { "source": "သောက်တလွဲ", "target": "total screw up / disastrous", "category": "slang" },
+    { "source": "ငပေါ", "target": "moron / simpleton", "category": "offensive" }
+  ]
+}

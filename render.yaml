@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: ezicyeagerbot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m bot.main
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OWNER_IDS
+        value: "5429173364"
+      - key: OWNER_USERNAMES
+        value: "Merlin_hermis"
+      - key: BOT_NAME
+        value: "EzicYeager"
+      - key: DEFAULT_TARGET_LANGUAGE
+        value: "en"
+      - key: DEFAULT_TRANSLATION_MODEL
+        value: "gemini-3.6-flash"
+      - key: TRANSLATION_PROVIDER
+        value: "gemini"
+      - key: DATABASE_URL
+        value: "sqlite+aiosqlite:///data/bot.db"
+      - key: LOG_LEVEL
+        value: "INFO"

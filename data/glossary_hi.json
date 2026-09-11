@@ -1,0 +1,27 @@
+{
+  "language": "hi",
+  "name": "Hindi / Hinglish",
+  "entries": [
+    { "source": "bhai", "target": "bro / brother", "category": "casual" },
+    { "source": "yaar", "target": "dude / friend", "category": "casual" },
+    { "source": "bhaijaan", "target": "respected brother / bro", "category": "casual" },
+    { "source": "kya chal raha hai", "target": "what's going on", "category": "casual" },
+    { "source": "kya bolte", "target": "what's up", "category": "slang" },
+    { "source": "mast", "target": "awesome / great", "category": "slang" },
+    { "source": "jhakaas", "target": "fantastic / lit", "category": "slang" },
+    { "source": "bawaal", "target": "crazy fire / chaos", "category": "slang" },
+    { "source": "chutiya", "target": "dumbfuck / dipshit", "category": "profanity" },
+    { "source": "bhenchod", "target": "sister-fucker / motherfucker", "category": "profanity" },
+    { "source": "madarchod", "target": "motherfucker", "category": "profanity" },
+    { "source": "gandu", "target": "asshole / bastard", "category": "profanity" },
+    { "source": "bhosdike", "target": "cunt / motherfucker", "category": "profanity" },
+    { "source": "harami", "target": "bastard / crook", "category": "offensive" },
+    { "source": "kamina", "target": "scumbag / jerk", "category": "offensive" },
+    { "source": "saala", "target": "bastard / jerk", "category": "offensive" },
+    { "source": "bakwaas", "target": "nonsense / bullshit", "category": "slang" },
+    { "source": "chup kar", "target": "shut up", "category": "offensive" },
+    { "source": "teri maa ki", "target": "fuck your mother", "category": "profanity" },
+    { "source": "chaddi phaad", "target": "insanely epic / explosive", "category": "slang" },
+    { "source": "aag laga di", "target": "killed it / set it on fire", "category": "slang" }
+  ]
+}

@@ -1,0 +1,37 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Environment files and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# SQLite Databases
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/bot.db
+
+# Logs and scratch files
+*.log
+scratch/
+chat_log.txt
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
