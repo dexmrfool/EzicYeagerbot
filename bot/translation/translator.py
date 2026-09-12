@@ -92,7 +92,7 @@ class GeminiTranslationEngine:
                     return cleaned
                 elif cleaned is None and raw_result and "NO_TRANSLATION" in raw_result:
                     # Model explicitly indicated NO_TRANSLATION
-                    return None
+                    return "__NO_TRANSLATION__"
 
             except Exception as e:
                 err_str = str(e)
@@ -158,6 +158,8 @@ class OpenAITranslationEngine:
                 temperature=0.2
             )
             raw = response.choices[0].message.content
+            if raw and "NO_TRANSLATION" in raw:
+                return "__NO_TRANSLATION__"
             cleaned = quality_checker.clean_output(raw)
             if cleaned and quality_checker.is_valid_translation(text, cleaned):
                 cache_manager.set_cached_translation(text, target_lang, cleaned)
@@ -204,6 +206,10 @@ class FreeTranslationEngine:
                         data = await resp.json(content_type=None)
                         if data and isinstance(data, list) and len(data) > 0 and len(data[0]) > 0:
                             translated = data[0][0]
+                            detected = data[0][1] if len(data[0]) > 1 else None
+                            # If Chrome-ex detected it's already in target language (e.g. 'en'), no translation needed!
+                            if detected and detected.lower() == target_lang.lower():
+                                return None
                             cleaned = quality_checker.clean_output(translated)
                             if cleaned and quality_checker.is_valid_translation(text, cleaned):
                                 cache_manager.set_cached_translation(text, target_lang, cleaned)
@@ -212,26 +218,28 @@ class FreeTranslationEngine:
         except Exception as ce:
             logger.warning(f"Chrome-Ex fallback translation error: {ce}")
 
-        # Second attempt: MyMemory public API
-        try:
-            import aiohttp
-            import urllib.parse
-            src = detected_lang or "auto"
-            langpair = f"{src}|{target_lang}"
-            url = f"https://api.mymemory.translated.net/get?q={urllib.parse.quote(text)}&langpair={urllib.parse.quote(langpair)}"
-            timeout = aiohttp.ClientTimeout(total=5)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url, headers={"User-Agent": "Mozilla/5.0"}) as resp:
-                    if resp.status == 200:
-                        data = await resp.json(content_type=None)
-                        translated = data.get("responseData", {}).get("translatedText")
-                        cleaned = quality_checker.clean_output(translated)
-                        if cleaned and quality_checker.is_valid_translation(text, cleaned):
-                            cache_manager.set_cached_translation(text, target_lang, cleaned)
-                            logger.info(f"Fallback translation succeeded via MyMemory: '{cleaned[:30]}...'")
-                            return cleaned
-        except Exception as me:
-            logger.warning(f"MyMemory fallback translation error: {me}")
+        # Second attempt: MyMemory public API (ONLY for known valid 2-letter source languages, NEVER 'unknown')
+        if detected_lang and len(detected_lang) in (2, 3) and detected_lang.lower() not in ("unknown", "auto", "en", target_lang.lower()):
+            try:
+                import aiohttp
+                import urllib.parse
+                src = detected_lang.lower()
+                langpair = f"{src}|{target_lang}"
+                url = f"https://api.mymemory.translated.net/get?q={urllib.parse.quote(text)}&langpair={urllib.parse.quote(langpair)}"
+                timeout = aiohttp.ClientTimeout(total=5)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(url, headers={"User-Agent": "Mozilla/5.0"}) as resp:
+                        if resp.status == 200:
+                            data = await resp.json(content_type=None)
+                            if data.get("responseStatus") == 200:
+                                translated = data.get("responseData", {}).get("translatedText")
+                                cleaned = quality_checker.clean_output(translated)
+                                if cleaned and quality_checker.is_valid_translation(text, cleaned):
+                                    cache_manager.set_cached_translation(text, target_lang, cleaned)
+                                    logger.info(f"Fallback translation succeeded via MyMemory: '{cleaned[:30]}...'")
+                                    return cleaned
+            except Exception as me:
+                logger.warning(f"MyMemory fallback translation error: {me}")
 
         return None
 
@@ -268,20 +276,28 @@ class ResilientTranslationEngine:
         # 1. Primary Engine
         if settings.TRANSLATION_PROVIDER.lower() == "openai" and self.openai_engine:
             res = await self.openai_engine.translate(text, target_lang, detected_lang, preserve_profanity)
+            if res == "__NO_TRANSLATION__":
+                return None
             if res:
                 return res
         elif self.gemini_engine:
             res = await self.gemini_engine.translate(text, target_lang, detected_lang, preserve_profanity)
+            if res == "__NO_TRANSLATION__":
+                return None
             if res:
                 return res
 
         # 2. Secondary Engine (Try the other LLM if configured)
         if self.openai_engine and settings.TRANSLATION_PROVIDER.lower() != "openai":
             res = await self.openai_engine.translate(text, target_lang, detected_lang, preserve_profanity)
+            if res == "__NO_TRANSLATION__":
+                return None
             if res:
                 return res
         elif self.gemini_engine and settings.TRANSLATION_PROVIDER.lower() == "openai":
             res = await self.gemini_engine.translate(text, target_lang, detected_lang, preserve_profanity)
+            if res == "__NO_TRANSLATION__":
+                return None
             if res:
                 return res
 

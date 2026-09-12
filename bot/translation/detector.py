@@ -49,7 +49,14 @@ class LanguageDetector:
         "talk", "talking", "tell", "telling", "ask", "asking", "answer",
         "help", "need", "feel", "feeling", "look", "looking", "find", "found",
         "happy", "sad", "tired", "busy", "home", "work", "life", "shit", "fuck",
-        "damn", "bitch", "ass", "dick", "crap", "bullshit", "crazy", "weird"
+        "damn", "bitch", "ass", "dick", "crap", "bullshit", "crazy", "weird",
+
+        # Common internet slang, greetings, acronyms & single-word tokens
+        "yo", "hi", "hey", "sup", "gm", "gn", "bye", "cya", "np", "ty", "thx",
+        "pls", "plz", "idk", "idc", "wdym", "omg", "wtf", "bruh", "bruv", "kk",
+        "oof", "yea", "yeah", "yup", "aight", "rn", "fr", "ngl", "tbh", "smh",
+        "afaik", "imo", "gtg", "brb", "hru", "wbu", "nah", "nope", "ez", "cct",
+        "give", "me", "done", "got", "can", "could", "gotta", "gonna", "wanna"
     }
 
     @classmethod
@@ -115,9 +122,15 @@ class LanguageDetector:
         if target_lang.lower() in ("en", "english"):
             if cls.is_likely_pure_english(clean_text):
                 return False, "en"
-            else:
-                # Ambiguous / foreign in Latin script
-                return True, "unknown"
+
+            # If Latin script with NO foreign markers:
+            # Short messages (<= 4 words) are almost certainly English slang, nicknames, or abbreviations
+            words = re.findall(r'\b[a-zA-Z]+\b', clean_text.lower())
+            if len(words) <= 4:
+                return False, "en"
+
+            # Ambiguous longer Latin script text
+            return True, "unknown"
 
         # If target language is non-English (e.g. Persian/Burmese), translate English messages
         return True, "en"

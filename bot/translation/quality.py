@@ -36,10 +36,24 @@ class QualityChecker:
 
         return clean
 
+    API_ERROR_PATTERNS = [
+        "INVALID SOURCE LANGUAGE",
+        "MYMEMORY WARNING",
+        "YOU USED ALL AVAILABLE FREE TRANSLATIONS",
+        "DAILY LIMIT",
+        "INVALID_ARGUMENT",
+        "QUERY LENGTH LIMIT EXCEEDED",
+    ]
+
     @classmethod
     def is_valid_translation(cls, original_text: str, translated_text: Optional[str]) -> bool:
         if not translated_text:
             return False
+
+        trans_upper = translated_text.upper()
+        for err_marker in cls.API_ERROR_PATTERNS:
+            if err_marker in trans_upper:
+                return False
 
         orig_clean = original_text.strip().lower()
         trans_clean = translated_text.strip().lower()
