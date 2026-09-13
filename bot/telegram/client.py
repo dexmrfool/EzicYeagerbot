@@ -18,6 +18,7 @@ def create_bot_and_dispatcher() -> tuple[Bot, Dispatcher]:
     # Register Middlewares
     dp.message.middleware(DeduplicationMiddleware())
     dp.message.middleware(DatabaseMiddleware())
+    dp.chat_member.middleware(DatabaseMiddleware())
 
     # Register Routers
     dp.include_router(main_router)

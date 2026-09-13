@@ -232,6 +232,7 @@ async def process_mention_all(message: Message, repo: BotRepository, raw_text: s
         members_to_tag = []
 
         # A. Fetch chat administrators
+        admin_count = 0
         try:
             admins = await message.chat.get_administrators()
             for adm in admins:
@@ -242,10 +243,12 @@ async def process_mention_all(message: Message, repo: BotRepository, raw_text: s
                         "first_name": adm.user.first_name or "Admin",
                         "username": adm.user.username
                     })
+                    admin_count += 1
         except Exception as ae:
             logger.warning(f"Could not retrieve chat administrators for @all: {ae}")
 
         # B. Fetch active members from DB
+        member_count = 0
         try:
             db_members = await repo.get_group_members(chat_id)
             for dbm in db_members:
@@ -256,17 +259,20 @@ async def process_mention_all(message: Message, repo: BotRepository, raw_text: s
                         "first_name": dbm.first_name or "Member",
                         "username": dbm.username
                     })
+                    member_count += 1
         except Exception as de:
             logger.warning(f"Could not retrieve DB members for @all: {de}")
 
         if not members_to_tag:
             await message.reply(
-                "ℹ️ **No other members found to tag yet.**\n"
-                "As group members send messages, they are automatically added to the `@all` mention directory!"
+                "ℹ️ **No other members found to tag yet.**\n\n"
+                "💡 **How to register members:**\n"
+                "As soon as group members send any message, sticker, or photo, they are automatically added to the `@all` directory!\n"
+                "Use `/members` to view the directory status."
             )
             return
 
-        logger.info(f"Starting @all mention broadcast for {len(members_to_tag)} members in chat {chat_id} by user {message.from_user.id}")
+        logger.info(f"Starting @all mention broadcast for {len(members_to_tag)} members ({admin_count} admins, {member_count} members) in chat {chat_id} by user {message.from_user.id}")
 
         # 4. Broadcast in batches of 5 members
         batch_size = 5
@@ -288,6 +294,8 @@ async def process_mention_all(message: Message, repo: BotRepository, raw_text: s
             body = f"📢 <b>{safe_prompt}</b>\n\n👥 " + " • ".join(mention_links)
             if total_batches > 1:
                 body += f"\n<i>({batch_num}/{total_batches})</i>"
+            if idx == 0 and member_count == 0:
+                body += "\n\n<i>💡 Note: Regular members are automatically added to @all as soon as they send a message or sticker.</i>"
 
             try:
                 await message.bot.send_message(
@@ -326,23 +334,35 @@ async def handle_cancel_mention(message: Message):
         await message.reply("ℹ️ No mention broadcast is currently active.")
 
 
-@router.message(F.new_chat_members)
-async def handle_new_chat_members(message: Message, repo: BotRepository):
-    """Automatically index new members joining the group."""
-    if not message.new_chat_members or message.chat.type == "private":
+@router.message(Command("members", "tagstatus", "taglist"))
+async def handle_members_status(message: Message, repo: BotRepository):
+    """Displays all known members registered in the @all mention directory."""
+    if message.chat.type == "private":
+        await message.reply("ℹ️ `/members` only works in group chats.")
         return
-    for member in message.new_chat_members:
-        if member.is_bot:
-            continue
-        try:
-            await repo.upsert_group_member(
-                telegram_group_id=message.chat.id,
-                telegram_user_id=member.id,
-                username=member.username,
-                first_name=member.first_name or "Member"
-            )
-        except Exception:
-            pass
+
+    chat_id = message.chat.id
+    admins = []
+    try:
+        admins = await message.chat.get_administrators()
+    except Exception:
+        pass
+
+    admin_users = [a.user for a in admins if not a.user.is_bot]
+    admin_ids = {a.id for a in admin_users}
+
+    db_members = await repo.get_group_members(chat_id)
+    regular_members = [m for m in db_members if m.telegram_user_id not in admin_ids]
+
+    total_taggable = len(admin_users) + len(regular_members)
+
+    await message.reply(
+        f"👥 **Group Mention Directory Status**\n\n"
+        f"• **Total Taggable Users:** {total_taggable}\n"
+        f"• **Administrators (Live):** {len(admin_users)}\n"
+        f"• **Active Members Indexed:** {len(regular_members)}\n\n"
+        f"💡 *Every member who sends any message or sticker in this group is automatically included in `@all`!*"
+    )
 
 
 # =====================================================================
@@ -393,17 +413,6 @@ async def handle_natural_message(message: Message, repo: BotRepository):
     chat_id = message.chat.id
     is_private = (message.chat.type == "private")
 
-    # Index active group members for the @all directory
-    if not is_private:
-        try:
-            await repo.upsert_group_member(
-                telegram_group_id=chat_id,
-                telegram_user_id=message.from_user.id,
-                username=message.from_user.username,
-                first_name=message.from_user.first_name or "Member"
-            )
-        except Exception:
-            pass
 
     # 2. Retrieve group configuration (with fast in-memory cache)
     group = cache_manager.get_cached_group(chat_id)
