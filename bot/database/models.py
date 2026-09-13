@@ -81,3 +81,16 @@ class TranslationCache(Base):
     translated_text: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=func.now())
     expires_at: Mapped[datetime.datetime] = mapped_column(DateTime, index=True, nullable=False)
+
+
+class GroupMember(Base):
+    """Tracks active members per group for @all announcements."""
+    __tablename__ = "group_members"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    telegram_group_id: Mapped[int] = mapped_column(BigInteger, index=True, nullable=False)
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, index=True, nullable=False)
+    username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    first_name: Mapped[str] = mapped_column(String(255), nullable=False, default="Member")
+    last_seen: Mapped[datetime.datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
+

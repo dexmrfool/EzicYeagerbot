@@ -7,7 +7,8 @@ from bot.database.models import (
     UserProfile,
     ConversationMemory,
     TranslationGlossary,
-    TranslationCache
+    TranslationCache,
+    GroupMember
 )
 from bot.config import settings
 from bot.utils.logging import logger
@@ -150,3 +151,49 @@ class BotRepository:
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def upsert_group_member(
+        self,
+        telegram_group_id: int,
+        telegram_user_id: int,
+        username: Optional[str] = None,
+        first_name: Optional[str] = None
+    ) -> None:
+        """Records or updates a user's active presence in a group for @all mentions."""
+        clean_first_name = first_name or "Member"
+        clean_username = username.lstrip("@") if username else None
+
+        stmt = select(GroupMember).where(
+            GroupMember.telegram_group_id == telegram_group_id,
+            GroupMember.telegram_user_id == telegram_user_id
+        )
+        result = await self.session.execute(stmt)
+        member = result.scalar_one_or_none()
+
+        now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+        if member:
+            member.username = clean_username
+            member.first_name = clean_first_name
+            member.last_seen = now
+        else:
+            member = GroupMember(
+                telegram_group_id=telegram_group_id,
+                telegram_user_id=telegram_user_id,
+                username=clean_username,
+                first_name=clean_first_name,
+                last_seen=now
+            )
+            self.session.add(member)
+
+        await self.session.commit()
+
+    async def get_group_members(self, telegram_group_id: int) -> List[GroupMember]:
+        """Fetches all known active members of a specific group."""
+        stmt = (
+            select(GroupMember)
+            .where(GroupMember.telegram_group_id == telegram_group_id)
+            .order_by(desc(GroupMember.last_seen))
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+

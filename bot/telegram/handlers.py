@@ -1,3 +1,6 @@
+import asyncio
+import html
+import re
 from datetime import datetime, timezone, timedelta
 from aiogram import Router, F
 from aiogram.filters import Command
@@ -148,6 +151,201 @@ async def handle_ai_command(message: Message, repo: BotRepository):
 
 
 # =====================================================================
+# MENTION ALL SYSTEM (@all, /all, @everyone, /tagall)
+# =====================================================================
+
+ACTIVE_TAGALL_TASKS: set[int] = set()
+
+
+async def is_mention_authorized(message: Message) -> bool:
+    """Checks if the user has permission to mention everyone (Owner, Group Creator, or Admin)."""
+    if not message.from_user:
+        return False
+    user_id = message.from_user.id
+    username = (message.from_user.username or "").lower().lstrip("@")
+
+    # 1. Global Owner check
+    if (user_id in settings.OWNER_IDS) or (username and username in settings.OWNER_USERNAMES):
+        return True
+
+    # 2. Group Admin / Creator check
+    if message.chat.type in ("group", "supergroup"):
+        try:
+            member = await message.chat.get_member(user_id)
+            if member.status in ("creator", "administrator"):
+                return True
+        except Exception:
+            pass
+
+    return False
+
+
+async def process_mention_all(message: Message, repo: BotRepository, raw_text: str):
+    """Core logic to broadcast mentions to all group members."""
+    if message.chat.type == "private":
+        await message.reply("ℹ️ `@all` mentions only work in group chats.")
+        return
+
+    chat_id = message.chat.id
+
+    # 1. Verify Permission
+    if not await is_mention_authorized(message):
+        warning = await message.reply(
+            "⚠️ **Permission Denied**: Only group administrators or bot owners can mention everyone."
+        )
+        await asyncio.sleep(5)
+        try:
+            await warning.delete()
+        except Exception:
+            pass
+        return
+
+    # Prevent concurrent spam in the same group
+    if chat_id in ACTIVE_TAGALL_TASKS:
+        await message.reply("⏳ A mention broadcast is already in progress. Use `/cancelall` to stop it.")
+        return
+
+    # 2. Extract Message / Prompt
+    clean_text = raw_text.strip()
+    prompt = re.sub(
+        r'^(?:/(?:all|everyone|tagall|mentionall)|@all|@everyone|@tagall)\s*',
+        '',
+        clean_text,
+        flags=re.IGNORECASE
+    ).strip()
+
+    reply_to_id = None
+    if message.reply_to_message:
+        reply_to_id = message.reply_to_message.message_id
+        if not prompt and message.reply_to_message.text:
+            prompt = "Attention to this message!"
+
+    if not prompt:
+        prompt = "Attention everyone!"
+
+    ACTIVE_TAGALL_TASKS.add(chat_id)
+
+    try:
+        # 3. Collect Members
+        bot_user = await message.bot.get_me()
+        seen_ids = {message.from_user.id, bot_user.id}
+        members_to_tag = []
+
+        # A. Fetch chat administrators
+        try:
+            admins = await message.chat.get_administrators()
+            for adm in admins:
+                if not adm.user.is_bot and adm.user.id not in seen_ids:
+                    seen_ids.add(adm.user.id)
+                    members_to_tag.append({
+                        "user_id": adm.user.id,
+                        "first_name": adm.user.first_name or "Admin",
+                        "username": adm.user.username
+                    })
+        except Exception as ae:
+            logger.warning(f"Could not retrieve chat administrators for @all: {ae}")
+
+        # B. Fetch active members from DB
+        try:
+            db_members = await repo.get_group_members(chat_id)
+            for dbm in db_members:
+                if dbm.telegram_user_id not in seen_ids:
+                    seen_ids.add(dbm.telegram_user_id)
+                    members_to_tag.append({
+                        "user_id": dbm.telegram_user_id,
+                        "first_name": dbm.first_name or "Member",
+                        "username": dbm.username
+                    })
+        except Exception as de:
+            logger.warning(f"Could not retrieve DB members for @all: {de}")
+
+        if not members_to_tag:
+            await message.reply(
+                "ℹ️ **No other members found to tag yet.**\n"
+                "As group members send messages, they are automatically added to the `@all` mention directory!"
+            )
+            return
+
+        logger.info(f"Starting @all mention broadcast for {len(members_to_tag)} members in chat {chat_id} by user {message.from_user.id}")
+
+        # 4. Broadcast in batches of 5 members
+        batch_size = 5
+        total_batches = (len(members_to_tag) + batch_size - 1) // batch_size
+        safe_prompt = html.escape(prompt)
+
+        for idx in range(0, len(members_to_tag), batch_size):
+            if chat_id not in ACTIVE_TAGALL_TASKS:
+                logger.info(f"Mention broadcast in chat {chat_id} stopped.")
+                break
+
+            batch = members_to_tag[idx:idx + batch_size]
+            mention_links = []
+            for m in batch:
+                safe_name = html.escape(m["first_name"])
+                mention_links.append(f'<a href="tg://user?id={m["user_id"]}">{safe_name}</a>')
+
+            batch_num = (idx // batch_size) + 1
+            body = f"📢 <b>{safe_prompt}</b>\n\n👥 " + " • ".join(mention_links)
+            if total_batches > 1:
+                body += f"\n<i>({batch_num}/{total_batches})</i>"
+
+            try:
+                await message.bot.send_message(
+                    chat_id=chat_id,
+                    text=body,
+                    parse_mode="HTML",
+                    reply_to_message_id=reply_to_id or message.message_id
+                )
+            except Exception as se:
+                logger.error(f"Error sending mention batch {batch_num} in {chat_id}: {se}")
+
+            # 1.5s interval to avoid flood wait
+            if idx + batch_size < len(members_to_tag):
+                await asyncio.sleep(1.5)
+
+    finally:
+        ACTIVE_TAGALL_TASKS.discard(chat_id)
+
+
+@router.message(Command("all", "everyone", "tagall", "mentionall"))
+async def handle_mention_command(message: Message, repo: BotRepository):
+    """Command-based mention all (/all <message>, /everyone <message>, /tagall <message>)."""
+    await process_mention_all(message, repo, message.text or "")
+
+
+@router.message(Command("cancelall", "stopall", "tagstop"))
+async def handle_cancel_mention(message: Message):
+    """Stops an ongoing @all broadcast."""
+    if not await is_mention_authorized(message):
+        return
+    chat_id = message.chat.id
+    if chat_id in ACTIVE_TAGALL_TASKS:
+        ACTIVE_TAGALL_TASKS.discard(chat_id)
+        await message.reply("🛑 **Mention broadcast stopped.**")
+    else:
+        await message.reply("ℹ️ No mention broadcast is currently active.")
+
+
+@router.message(F.new_chat_members)
+async def handle_new_chat_members(message: Message, repo: BotRepository):
+    """Automatically index new members joining the group."""
+    if not message.new_chat_members or message.chat.type == "private":
+        return
+    for member in message.new_chat_members:
+        if member.is_bot:
+            continue
+        try:
+            await repo.upsert_group_member(
+                telegram_group_id=message.chat.id,
+                telegram_user_id=member.id,
+                username=member.username,
+                first_name=member.first_name or "Member"
+            )
+        except Exception:
+            pass
+
+
+# =====================================================================
 # NATURAL MESSAGE PIPELINE (Translation + Butler AI)
 # =====================================================================
 
@@ -156,8 +354,9 @@ async def handle_natural_message(message: Message, repo: BotRepository):
     """
     Core natural language pipeline.
     Zero commands required. Automatically handles:
-    1. Butler AI conversational response (if enabled and addressed)
-    2. Automatic multilingual translation (if foreign language detected)
+    1. @all / @everyone mentions
+    2. Butler AI conversational response (if enabled and addressed)
+    3. Automatic multilingual translation (if foreign language detected)
     """
     # 1. Ignore own messages or messages from other bots to prevent infinite loops
     if not message.from_user or message.from_user.is_bot:
@@ -165,6 +364,12 @@ async def handle_natural_message(message: Message, repo: BotRepository):
 
     text = message.text.strip()
     if not text:
+        return
+
+    # Check for @all or @everyone mentions in natural text
+    clean_lower = text.lower()
+    if clean_lower.startswith(("@all", "@everyone", "@tagall")):
+        await process_mention_all(message, repo, text)
         return
 
     # Ignore slash commands so we don't translate slash commands
@@ -187,6 +392,18 @@ async def handle_natural_message(message: Message, repo: BotRepository):
 
     chat_id = message.chat.id
     is_private = (message.chat.type == "private")
+
+    # Index active group members for the @all directory
+    if not is_private:
+        try:
+            await repo.upsert_group_member(
+                telegram_group_id=chat_id,
+                telegram_user_id=message.from_user.id,
+                username=message.from_user.username,
+                first_name=message.from_user.first_name or "Member"
+            )
+        except Exception:
+            pass
 
     # 2. Retrieve group configuration (with fast in-memory cache)
     group = cache_manager.get_cached_group(chat_id)
